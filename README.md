@@ -44,25 +44,13 @@ uv run prusa2orca list Anycubic
 ### Convert a printer's profiles
 
 ```bash
+# Konvertiert Profile + lädt Bett-Modell/Textur/Thumbnail automatisch runter
 uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles
 uv run prusa2orca convert Voron -p "Voron V2.4 350" \
   --machine-inherits fdm_machine_common --process-inherits fdm_process_common \
   --nozzle 0.4 -o ./voron
-```
 
-### Download bed models, textures, and thumbnails
-
-```bash
-uv run prusa2orca assets Creality -p "Creality CR-5 Pro H" -o ./profiles
-
-### Import directly via OrcaSlicer UI
-
-```bash
-# Generate with 'from': 'user' (default)
-uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles
-
-# Then in OrcaSlicer: File → Import → Import Configs → select all .json files
-```
+# Danach in OrcaSlicer: File → Import → Import Configs → alle .json auswählen
 ```
 
 ### Options
