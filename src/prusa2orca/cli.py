@@ -287,7 +287,7 @@ def cmd_convert(args: argparse.Namespace):
     total = _count_files(output_dir)
     log.info(f"\nDone! {total} files written to {output_dir}/")
     install_path = f"~/.config/OrcaSlicer/system/{vendor}/"
-    log.info(f"Install: cp -r machine/ process/ filament/ {install_path}")
+    log.info(f"Install: mkdir -p {install_path} && cp -ri machine/ process/ filament/ {install_path}")
 
 
 def cmd_assets(args: argparse.Namespace):

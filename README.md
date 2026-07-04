@@ -92,15 +92,26 @@ profiles/
 ## Installation in OrcaSlicer
 
 ```bash
-# Copy to user config
-cp -r machine/ process/ filament/ ~/.config/OrcaSlicer/system/Creality/
-# Then restart OrcaSlicer
+# 1. OrcaSlicer schließen
+
+# 2. Profile ins system-Verzeichnis kopieren
+mkdir -p ~/.config/OrcaSlicer/system/Creality/machine
+mkdir -p ~/.config/OrcaSlicer/system/Creality/process
+mkdir -p ~/.config/OrcaSlicer/system/Creality/filament
+
+cp -i machine/*.json           ~/.config/OrcaSlicer/system/Creality/machine/
+cp -i process/*.json           ~/.config/OrcaSlicer/system/Creality/process/
+cp -i filament/*.json          ~/.config/OrcaSlicer/system/Creality/filament/
+cp -i machine/*.stl machine/*.svg machine/*.png \
+     ~/.config/OrcaSlicer/system/Creality/machine/
+
+# 3. OrcaSlicer starten
 ```
 
-Clear the system cache if profiles don't show up:
-```bash
-rm -rf ~/.config/OrcaSlicer/system/Creality/
-```
+> **Hinweis:** `cp -i` fragt vor Überschreiben. Alte Profile bleiben erhalten.
+> Falls Profile nach dem Start nicht auftauchen: *Help → Show Configuration Folder*,
+> das `system/`-Verzeichnis öffnen und **nur die neuen JSON-Dateien dort ablegen**,
+> ohne das ganze Verzeichnis zu löschen.
 
 ## How it works
 
