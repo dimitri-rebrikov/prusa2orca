@@ -1,0 +1,25 @@
+[project]
+name = "prusa2orca"
+version = "0.1.0"
+description = "Convert PrusaSlicer printer profiles to OrcaSlicer format"
+authors = [{ name = "Dimitri Rebrikov" }]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+prusa2orca = "prusa2orca.cli:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
