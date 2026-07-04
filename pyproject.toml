@@ -3,6 +3,7 @@ name = "prusa2orca"
 version = "0.1.0"
 description = "Convert PrusaSlicer printer profiles to OrcaSlicer format"
 authors = [{ name = "Dimitri Rebrikov" }]
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = []
 

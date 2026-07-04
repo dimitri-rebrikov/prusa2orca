@@ -110,7 +110,7 @@ def build_machine_model_json(
     data = {
         "type": "machine_model",
         "name": name,
-        "model_id": f"{family}-{prusa_section.profile_name}",
+        "model_id": f"{vs}-{prusa_section.profile_name}",
         "nozzle_diameter": params.get("variants", "0.4"),
         "machine_tech": params.get("technology", "FFF"),
         "family": family,
