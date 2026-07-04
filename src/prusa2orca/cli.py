@@ -362,10 +362,19 @@ Examples:
     if hasattr(args, 'vendor') and not args.vendor and hasattr(args, 'printer') and args.printer:
         args.vendor = args.printer.split()[0] if ' ' in args.printer else args.printer
 
-    # Default output: .orca_printer file next to cwd
-    if hasattr(args, 'output') and args.output is None and args.command == 'convert':
-        safe_name = _safe_fn(args.printer)
-        args.output = Path(f"{args.vendor} {safe_name}.orca_printer")
+    # Default output: .orca_printer file
+    if hasattr(args, 'output') and args.command == 'convert':
+        p = args.output
+        if p is None:
+            safe_name = _safe_fn(args.printer)
+            args.output = Path(f"{args.vendor} {safe_name}.orca_printer")
+        elif p.suffix and p.suffix != ".orca_printer":
+            log.warning(f"  ⚠ Expected .orca_printer extension, got '{p.suffix}'")
+            log.warning(f"  → Rename to: {p.with_suffix('.orca_printer')}")
+            log.warning(f"  → File created at: {p}")
+        else:
+            # No suffix at all — add .orca_printer
+            args.output = p.with_suffix(".orca_printer")
 
     try:
         if args.command == "vendors":
