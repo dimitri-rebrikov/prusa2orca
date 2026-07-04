@@ -1,0 +1,51 @@
+{
+    "type": "filament",
+    "name": "Creality Generic TPU @Creality CR-5 Pro H",
+    "inherits": "fdm_filament_tpu",
+    "instantiation": "true",
+    "from": "user",
+    "setting_id": "EFD8Tn51hte",
+    "hot_plate_temp": [
+        "30"
+    ],
+    "hot_plate_temp_initial_layer": [
+        "30"
+    ],
+    "nozzle_temperature": [
+        "235"
+    ],
+    "nozzle_temperature_initial_layer": [
+        "245"
+    ],
+    "filament_type": [
+        "TPU"
+    ],
+    "filament_density": [
+        "1.21"
+    ],
+    "filament_diameter": [
+        "1.75"
+    ],
+    "filament_cost": [
+        "34.99"
+    ],
+    "filament_max_volumetric_speed": [
+        "1.2"
+    ],
+    "filament_flow_ratio": [
+        "1.16"
+    ],
+    "default_filament_colour": "#4D9398",
+    "filament_vendor": "Eolas Prints",
+    "reduce_fan_stop_start_freq": "0",
+    "fan_cooling_layer_time": "0",
+    "fan_max_speed": "0",
+    "fan_min_speed": "0",
+    "overhang_fan_speed": "30",
+    "close_fan_the_first_x_layers": "3",
+    "slow_down_layer_time": "20",
+    "slow_down_min_speed": "15",
+    "compatible_printers": [
+        "Creality CR-5 Pro H 0.4 nozzle"
+    ]
+}

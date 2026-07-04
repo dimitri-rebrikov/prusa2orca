@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,8 @@ from prusa2orca.remote import get_ini, list_vendors
 
 # Disable logging noise during tests
 logging.disable(logging.CRITICAL)
+
+GOLDEN_DIR = Path(__file__).parent / "golden"
 
 
 class Args:
@@ -160,3 +163,55 @@ def test_json_schema():
         if d["type"] != "machine_model":
             assert "setting_id" in d, f"{json_file.name}: missing setting_id"
         assert "instantiation" in d, f"{json_file.name}: missing instantiation"
+
+
+def _normalize_json(data) -> str:
+    """Deterministic JSON string for comparison (sorted keys, no extra whitespace)."""
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+
+def test_golden_files_match():
+    """Compare current output against golden reference files.
+
+    Golden files were generated with:
+      prusa2orca convert Creality -p "Creality CR-5 Pro H"
+    and represent the known-good output.
+    
+    If this test fails after a code change, it means the output differs.
+    If the change is intentional, update the golden files with:
+      python3 -m json.tool current.json > tests/golden/file.json
+    """
+    if not GOLDEN_DIR.exists() or not list(GOLDEN_DIR.glob("*.json")):
+        pytest.skip("No golden files found — run the test once to generate them")
+
+    args = Args()
+    cmd_convert(args)
+
+    # Read current output
+    current = {}
+    for jf in args.output.rglob("*.json"):
+        key = jf.name
+        current[key] = json.loads(jf.read_text())
+
+    # Compare against golden
+    for golden_file in sorted(GOLDEN_DIR.glob("*.json")):
+        key = golden_file.name
+        assert key in current, f"Missing output file: {key} (golden has it)"
+
+        golden = json.loads(golden_file.read_text())
+        actual = current[key]
+
+        g_norm = _normalize_json(golden)
+        a_norm = _normalize_json(actual)
+
+        assert g_norm == a_norm, (
+            f"JSON mismatch in {key}\n"
+            f"  Golden: {golden_file}\n"
+            f"  To update: python3 -m json.tool /tmp/test_prusa2orca/{key} > {golden_file}"
+        )
+        del current[key]  # remove from dict to track extras
+
+    # Warn about extra files (in current but not in golden)
+    for extra in current:
+        if not extra.endswith(".stl") and not extra.endswith(".svg") and "_cover.png" not in extra:
+            print(f"  ⚠ Extra output file not in golden: {extra}")
