@@ -44,13 +44,12 @@ uv run prusa2orca list Anycubic
 ### Convert a printer's profiles
 
 ```bash
-# Konvertiert Profile + lädt Bett-Modell/Textur/Thumbnail automatisch runter
-uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles
-uv run prusa2orca convert Voron -p "Voron V2.4 350" \
-  --machine-inherits fdm_machine_common --process-inherits fdm_process_common \
-  --nozzle 0.4 -o ./voron
+# Erzeugt eine .orca_printer Datei — direkt in Orca importierbar
+uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./CR-5-Pro-H.orca_printer
+uv run prusa2orca convert Voron -p "Voron V2.4 350" -o ./Voron24.orca_printer
 
-# Danach in OrcaSlicer: File → Import → Import Configs → alle .json auswählen
+# Import: File → Import → Import Configs → .orca_printer auswählen
+# Oder: Datei auf Orca-Fenster ziehen
 ```
 
 ### Options
@@ -58,54 +57,33 @@ uv run prusa2orca convert Voron -p "Voron V2.4 350" \
 | Flag | Description |
 |------|-------------|
 | `-p, --printer` | Printer model name (e.g. `"Creality CR-5 Pro H"`) |
-| `-o, --output` | Output directory |
+| `-o, --output` | Output path (`.orca_printer` file, default: auto-named) |
 | `--nozzle` | Target nozzle diameter (default: `0.4`) |
-| `--machine-inherits` | Orca machine base profile (default: auto-detect) |
-| `--process-inherits` | Orca process base profile (default: auto-detect) |
 | `--refetch` | Force re-download of the vendor .ini |
 | `-v` | Verbose logging |
 
-## Output structure
+## Output
+
+Eine einzelne `.orca_printer` Datei (ZIP):
 
 ```
-profiles/
-├── machine/
-│   ├── Creality CR-5 Pro H.json                 (machine_model)
-│   ├── Creality CR-5 Pro H 0.4 nozzle.json      (machine variant)
-│   ├── creality_cr5pro_buildplate_model.stl      (bed STL)
-│   ├── creality_cr5pro_buildplate_texture.svg    (bed texture)
-│   └── Creality CR-5 Pro H_cover.png             (thumbnail)
-├── process/
-│   ├── 0.06mm SuperDetail @Creality ...
-│   ├── 0.20mm Standard @Creality ...
-│   └── (8+ profiles per nozzle)
-└── filament/
-    ├── Creality Generic PLA @Creality ...
-    ├── Creality Generic ABS @Creality ...
-    └── ...
+Creality CR-5 Pro H.orca_printer
+├── bundle_structure.json        ← Manifest
+├── printer/*.json               ← Druckervarianten (pro Düse)
+├── process/*.json               ← Druckprofile (layer heights)
+└── filament/*.json              ← Filamentprofile (PLA, PETG, ABS, TPU)
 ```
 
 ## Installation in OrcaSlicer
 
-**Methode 1 — Per UI importieren (empfohlen):**
-
 ```bash
-uv run prusa2orca convert Creality -p "CR-5 Pro H" -o ./profiles
-# OrcaSlicer → File → Import → Import Configs → alle .json auswählen
+# 1. .orca_printer Datei generieren
+uv run prusa2orca convert Creality -p "CR-5 Pro H" -o ./CR-5-Pro-H.orca_printer
+
+# 2. In Orca importieren:
+#    File → Import → Import Configs → CR-5-Pro-H.orca_printer auswählen
+#    Oder: Datei auf das Orca-Fenster ziehen
 ```
-
-**Methode 2 — Direkt ins User-Verzeichnis kopieren:**
-
-```bash
-# Orca einmal starten → schließen (damit User-Ordner existiert)
-uv run prusa2orca convert Creality -p "CR-5 Pro H" -o ./profiles
-
-UID=$(ls ~/.config/OrcaSlicer/user/ | head -1)
-mkdir -p ~/.config/OrcaSlicer/user/$UID/creality
-cp -ri profiles/* ~/.config/OrcaSlicer/user/$UID/creality/
-```
-
-> Beide Methoden legen Profile als `"from": "user"` an → **update-sicher** und via `Import Configs` kompatibel.
 
 ## How it works
 

@@ -1,0 +1,27 @@
+{
+    "bundle_id": "_Creality CR-5 Pro H_20260704143528",
+    "bundle_type": "printer config bundle",
+    "printer_config": [
+        "printer/Creality CR-5 Pro H 0.3 nozzle.json",
+        "printer/Creality CR-5 Pro H 0.4 nozzle.json",
+        "printer/Creality CR-5 Pro H 0.5 nozzle.json",
+        "printer/Creality CR-5 Pro H 0.6 nozzle.json"
+    ],
+    "process_config": [
+        "process/0.06mm SuperDetail @Creality CR-5 Pro H 0.4.json",
+        "process/0.08mm SuperDetail @Creality CR-5 Pro H 0.4.json",
+        "process/0.10mm HighDetail @Creality CR-5 Pro H 0.4.json",
+        "process/0.12mm Detail @Creality CR-5 Pro H 0.4.json",
+        "process/0.16mm Optimal @Creality CR-5 Pro H 0.4.json",
+        "process/0.20mm Standard @Creality CR-5 Pro H 0.4.json",
+        "process/0.24mm Draft @Creality CR-5 Pro H 0.4.json",
+        "process/0.28mm SuperDraft @Creality CR-5 Pro H 0.4.json"
+    ],
+    "filament_config": [
+        "filament/Creality Generic PLA @Creality CR-5 Pro H.json",
+        "filament/Creality Generic ABS @Creality CR-5 Pro H.json",
+        "filament/Creality Generic PETG @Creality CR-5 Pro H.json",
+        "filament/Creality Generic TPU @Creality CR-5 Pro H.json"
+    ],
+    "version": "2.3.1.10"
+}

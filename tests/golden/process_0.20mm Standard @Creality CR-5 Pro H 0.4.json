@@ -1,14 +1,14 @@
 {
-    "type": "process",
-    "name": "0.12mm Detail @Creality CR-5 Pro H 0.4",
-    "inherits": "fdm_process_creality_common",
-    "instantiation": "true",
-    "from": "user",
-    "setting_id": "KBJgoUIJfc8",
-    "layer_height": "0.12",
+    "from": "User",
+    "name": "0.20mm Standard @Creality CR-5 Pro H 0.4",
+    "print_settings_id": "0.20mm Standard @Creality CR-5 Pro H 0.4",
+    "is_custom_defined": "0",
+    "version": "2.3.1.10",
+    "inherits": "",
+    "layer_height": "0.20",
     "initial_layer_print_height": "0.2",
-    "bottom_shell_layers": "6",
-    "top_shell_layers": "7",
+    "bottom_shell_layers": "4",
+    "top_shell_layers": "5",
     "wall_loops": "3",
     "spiral_mode": "0",
     "sparse_infill_density": "15%",
@@ -57,7 +57,7 @@
     "ironing_type": "top",
     "ironing_flow": "10%",
     "ironing_spacing": "0.1",
-    "bridge_flow": "0.70",
+    "bridge_flow": "0.95",
     "detect_overhang_wall": "0",
     "detect_thin_wall": "0",
     "seam_position": "nearest",
@@ -69,8 +69,5 @@
     "filament_max_volumetric_speed": "0",
     "resolution": "0",
     "gcode_substitutions": "0",
-    "filename_format": "[input_filename_base]_[print_time]_{digits(layer_height,1,2)}mm_[nozzle_temperature]C_[filament_type]_[printer_model].gcode",
-    "compatible_printers": [
-        "Creality CR-5 Pro H 0.4 nozzle"
-    ]
+    "filename_format": "[input_filename_base]_[print_time]_{digits(layer_height,1,2)}mm_[nozzle_temperature]C_[filament_type]_[printer_model].gcode"
 }

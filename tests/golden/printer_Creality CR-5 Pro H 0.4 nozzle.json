@@ -1,13 +1,29 @@
 {
-    "type": "machine",
+    "from": "User",
     "name": "Creality CR-5 Pro H 0.4 nozzle",
-    "inherits": "fdm_creality_common",
-    "instantiation": "true",
-    "from": "user",
-    "setting_id": "5oKZcVvG9mB",
+    "printer_settings_id": "Creality CR-5 Pro H 0.4 nozzle",
+    "is_custom_defined": "0",
+    "version": "2.3.1.10",
+    "inherits": "",
     "printer_model": "Creality CR-5 Pro H",
     "printer_structure": "i3",
-    "default_print_profile": "0.20mm Standard @Creality CR-5 Pro H 0.4",
+    "printer_technology": "FFF",
+    "printer_variant": "0.4",
+    "default_print_profile": "",
+    "default_filament_profile": [
+        "Creality Generic PLA"
+    ],
+    "nozzle_diameter": [
+        "0.4"
+    ],
+    "nozzle_type": "undefine",
+    "auxiliary_fan": "0",
+    "scan_first_layer": "0",
+    "silent_mode": "0",
+    "single_extruder_multi_material": "0",
+    "wipe": [
+        "1"
+    ],
     "printable_area": [
         "5x5",
         "295x5",
@@ -15,9 +31,6 @@
         "5x220"
     ],
     "printable_height": "380",
-    "nozzle_diameter": [
-        "0.4"
-    ],
     "min_layer_height": [
         "0.06"
     ],
@@ -52,13 +65,7 @@
     "retract_restart_extra_toolchange": [
         "0"
     ],
-    "wipe": [
-        "1"
-    ],
     "gcode_flavor": "marlin",
-    "printer_technology": "FFF",
-    "silent_mode": "0",
-    "single_extruder_multi_material": "0",
     "use_firmware_retraction": "0",
     "use_relative_e_distances": "1",
     "z_offset": "0",
@@ -118,12 +125,5 @@
     "layer_change_gcode": ";BEFORE_LAYER_CHANGE\\nG92 E0\\n;[layer_z]\\n\\n",
     "change_filament_gcode": "",
     "machine_pause_gcode": "",
-    "printer_notes": "Don't remove the following keywords! These keywords are used in the \"compatible printer\" condition of the print and filament profiles to link the particular print and filament profiles to this printer profile.\\nPRINTER_VENDOR_CREALITY\\nPRINTER_MODEL_CR5PROH\\nPRINTER_HAS_BOWDEN",
-    "printer_settings_id": "",
-    "default_filament_profile": [
-        "Creality Generic PLA"
-    ],
-    "scan_first_layer": "0",
-    "nozzle_type": "undefine",
-    "auxiliary_fan": "0"
+    "printer_notes": "Don't remove the following keywords! These keywords are used in the \"compatible printer\" condition of the print and filament profiles to link the particular print and filament profiles to this printer profile.\\nPRINTER_VENDOR_CREALITY\\nPRINTER_MODEL_CR5PROH\\nPRINTER_HAS_BOWDEN"
 }

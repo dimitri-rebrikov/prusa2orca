@@ -173,7 +173,6 @@ PRINTER_PARAM_MAP: Dict[str, str] = {
     "toolchange_gcode": "change_filament_gcode",
     "pause_print_gcode": "machine_pause_gcode",
     "printer_notes": "printer_notes",
-    "printer_settings_id": "printer_settings_id",
 }
 
 # ─── All maps keyed by section type ───

@@ -1,13 +1,12 @@
 """
 Build OrcaSlicer JSON profiles from resolved PrusaSlicer parameters.
 
-Generates:
-  - machine_model JSON (printer model registration)
-  - machine JSON (printer variant with nozzle)
-  - process JSON (print profiles)
-  - filament JSON (filament profiles)
+Generates user-format JSONs compatible with .orca_printer bundles:
+  - printer/*.json       (machine variant)
+  - process/*.json       (print profiles)
+  - filament/*.json      (filament profiles)
 
-Vendor-agnostic: works with any PrusaSlicer .ini (Creality, Voron, Anycubic, etc.)
+All use "from": "User" format — importable via Import Configs.
 """
 
 from __future__ import annotations
@@ -23,34 +22,14 @@ from .mapper import (
     PRINT_PARAM_MAP,
     PRINTER_PARAM_MAP,
     convert_value,
-    get_parameter_map,
-    sanitize_profile_name,
 )
-from .models import OrcaProfile, PrusaSection, SectionType
+from .models import PrusaSection, SectionType
 from .parser import PrusaSection, resolve_inherits
 
 log = logging.getLogger(__name__)
 
-# Base62 charset (OrcaSlicer-style)
-_BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-
-def _base62_encode(num: int) -> str:
-    if num == 0:
-        return _BASE62[0]
-    result = []
-    while num > 0:
-        result.append(_BASE62[num % 62])
-        num //= 62
-    return "".join(reversed(result))
-
-
-def make_setting_id(vendor: str, ptype: str, name: str) -> str:
-    """Deterministic OrcaSlicer setting_id from vendor/type/name."""
-    ns = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-    id_str = f"{vendor}/{ptype}/{name}"
-    hex_id = uuid.uuid5(ns, id_str).hex[:16]
-    return _base62_encode(int(hex_id, 16))
+# Orca version for user preset compatibility
+ORCA_VERSION = "2.3.1.10"
 
 
 def vendor_slug(vendor: str) -> str:
@@ -96,76 +75,55 @@ def _strip_vendor_prefix(name: str, vendor: str) -> str:
     return name
 
 
-def build_machine_model_json(
-    prusa_section: PrusaSection,
-    vendor: str = "Custom",
-) -> OrcaProfile:
-    """Build a machine_model JSON from a [printer_model:XYZ] section."""
-    params = prusa_section.params
-    family = params.get("family", vendor)
-    name = params.get("name", "")
-    vs = vendor_slug(vendor)
-    pk = prusa_section.profile_name.lower()
-
-    data = {
-        "type": "machine_model",
+def _user_meta(name: str, settings_key: str, inherits: str = "") -> Dict[str, str]:
+    """Common user-format header fields."""
+    return {
+        "from": "User",
         "name": name,
-        "model_id": f"{vs}-{prusa_section.profile_name}",
-        "nozzle_diameter": params.get("variants", "0.4"),
-        "machine_tech": params.get("technology", "FFF"),
-        "family": family,
-        "bed_model": f"{vs}_{pk}_buildplate_model.stl",
-        "bed_texture": f"{vs}_{pk}_buildplate_texture.svg",
-        "hotend_model": "",
-        "default_materials": params.get("default_materials", ""),
+        settings_key: name,
+        "is_custom_defined": "0",
+        "version": ORCA_VERSION,
+        "inherits": inherits,
     }
-
-    return OrcaProfile(
-        type="machine_model",
-        name=name,
-        from_field="system",
-        instantiation="false",
-        data=data,
-    )
 
 
 def build_machine_json(
     resolved_params: Dict[str, str],
     printer_model_name: str,
     vendor: str = "Custom",
-    inherits_target: str = "fdm_machine_common",
-) -> OrcaProfile:
+) -> Dict[str, Any]:
     """
-    Build a machine variant JSON from resolved printer params.
+    Build a machine variant dict (printer JSON) from resolved printer params.
 
-    inherits_target: the Orca base profile to inherit from.
-      - 'fdm_machine_common' — works for any vendor (universal base)
-      - 'fdm_creality_common' — Creality-specific defaults
-      Pass via CLI --machine-inherits.
+    User format: no type, no setting_id, no instantiation.
+    Uses the actual resolved values as a standalone profile.
     """
     nozzle = resolved_params.get("nozzle_diameter", "0.4")
     display_name = _strip_vendor_prefix(printer_model_name, vendor)
     name = f"{vendor} {display_name} {nozzle} nozzle"
 
-    data: Dict[str, Any] = {
-        "type": "machine",
-        "name": name,
-        "inherits": inherits_target,
-        "from": "system",
-        "setting_id": make_setting_id(vendor, "machine", name),
-        "instantiation": "true",
-        "printer_model": f"{vendor} {display_name}",
-        "printer_structure": "i3",
-        "default_print_profile": f"0.20mm Standard @{vendor} {display_name} {nozzle}",
-    }
+    data = _user_meta(name, "printer_settings_id", inherits="")
+
+    # Orca-specific fields
+    data["printer_model"] = f"{vendor} {display_name}"
+    data["printer_structure"] = "i3"
+    data["printer_technology"] = "FFF"
+    data["printer_variant"] = nozzle
+    data["default_print_profile"] = ""
+    data["default_filament_profile"] = [f"{vendor} Generic PLA"]
+    data["nozzle_diameter"] = [nozzle]
+    data["nozzle_type"] = "undefine"
+    data["auxiliary_fan"] = "0"
+    data["scan_first_layer"] = "0"
+    data["silent_mode"] = "0"
+    data["single_extruder_multi_material"] = "1"
+    data["wipe"] = ["1"]
 
     # Map printer params
     for prusa_key, orca_key in PRINTER_PARAM_MAP.items():
         if prusa_key in resolved_params:
             val = resolved_params[prusa_key]
-            if prusa_key in ("nozzle_diameter",):
-                data[orca_key] = [val]
-            elif prusa_key in (
+            array_keys = (
                 "machine_max_acceleration_x", "machine_max_acceleration_y",
                 "machine_max_acceleration_z", "machine_max_acceleration_e",
                 "machine_max_acceleration_extruding", "machine_max_acceleration_retracting",
@@ -179,13 +137,14 @@ def build_machine_json(
                 "retract_lift", "retract_before_travel", "retract_before_wipe",
                 "retract_restart_extra", "retract_length_toolchange",
                 "retract_restart_extra_toolchange", "wipe",
-                "min_layer_height", "max_layer_height",
-            ):
+                "min_layer_height", "max_layer_height", "nozzle_diameter",
+            )
+            if prusa_key in array_keys:
                 data[orca_key] = [val]
             else:
                 data[orca_key] = val
 
-    # Bed shape → printable_area list
+    # Bed shape
     if "bed_shape" in resolved_params:
         data["printable_area"] = [x.strip() for x in resolved_params["bed_shape"].split(",")]
 
@@ -202,19 +161,7 @@ def build_machine_json(
         if gcode_key in resolved_params:
             data[orca_key] = convert_value(gcode_key, resolved_params[gcode_key])
 
-    data["default_filament_profile"] = [f"{vendor} Generic PLA"]
-    data["scan_first_layer"] = "0"
-    data["nozzle_type"] = "undefine"
-    data["auxiliary_fan"] = "0"
-
-    return OrcaProfile(
-        type="machine",
-        name=name,
-        inherits=inherits_target,
-        from_field="system",
-        setting_id=make_setting_id(vendor, "machine", name),
-        data=data,
-    )
+    return data
 
 
 def build_process_json(
@@ -222,14 +169,11 @@ def build_process_json(
     section_name: str,
     printer_display_name: str,
     vendor: str = "Custom",
-    inherits_target: str = "fdm_process_common",
-) -> OrcaProfile:
+) -> Dict[str, Any]:
     """
-    Build a process (print profile) JSON from resolved params.
+    Build a process dict from resolved params.
 
-    inherits_target: the Orca base process to inherit from.
-      - 'fdm_process_common' — universal
-      - 'fdm_process_creality_common' — Creality-specific
+    User format: no type, setting_id, instantiation, compatible_printers.
     """
     nozzle = resolved_params.get("nozzle_diameter", resolved_params.get("printer_variant", "0.4"))
     layer_h = resolved_params.get("layer_height", "0.20")
@@ -238,36 +182,17 @@ def build_process_json(
     printer_short = _strip_vendor_prefix(printer_display_name, vendor)
     name = f"{quality_name} @{vendor} {printer_short} {nozzle}"
 
-    data: Dict[str, Any] = {
-        "type": "process",
-        "name": name,
-        "inherits": inherits_target,
-        "from": "system",
-        "setting_id": make_setting_id(vendor, "process", name),
-        "instantiation": "true",
-    }
+    data = _user_meta(name, "print_settings_id", inherits="")
 
     for prusa_key, orca_key in PRINT_PARAM_MAP.items():
         if prusa_key in resolved_params:
-            val = convert_value(prusa_key, resolved_params[prusa_key])
-            data[orca_key] = val
+            data[orca_key] = convert_value(prusa_key, resolved_params[prusa_key])
 
     for prusa_key, orca_key in FILAMENT_PARAM_MAP.items():
         if prusa_key in resolved_params and orca_key not in data:
             data[orca_key] = convert_value(prusa_key, resolved_params[prusa_key])
 
-    nozzle_for_name = resolved_params.get("nozzle_diameter", resolved_params.get("printer_variant", "0.4"))
-    printer_variant_name = f"{vendor} {printer_short} {nozzle_for_name} nozzle"
-    data["compatible_printers"] = [printer_variant_name]
-
-    return OrcaProfile(
-        type="process",
-        name=name,
-        inherits=inherits_target,
-        from_field="system",
-        setting_id=make_setting_id(vendor, "process", name),
-        data=data,
-    )
+    return data
 
 
 def build_filament_json(
@@ -275,45 +200,51 @@ def build_filament_json(
     section_name: str,
     printer_display_name: str,
     vendor: str = "Custom",
-) -> OrcaProfile:
-    """Build a filament JSON from resolved params."""
+) -> Dict[str, Any]:
+    """Build a filament dict from resolved params."""
     filament_type = resolved_params.get("filament_type", "PLA")
     printer_short = _strip_vendor_prefix(printer_display_name, vendor)
     name = f"{vendor} Generic {filament_type} @{vendor} {printer_short}"
 
-    data: Dict[str, Any] = {
-        "type": "filament",
-        "name": name,
-        "inherits": f"fdm_filament_{filament_type.lower()}",
-        "from": "system",
-        "setting_id": make_setting_id(vendor, "filament", name),
-        "instantiation": "true",
-    }
+    data = _user_meta(name, "filament_settings_id",
+                       inherits=f"fdm_filament_{filament_type.lower()}")
 
     for prusa_key, orca_key in FILAMENT_PARAM_MAP.items():
         if prusa_key in resolved_params:
             val = convert_value(prusa_key, resolved_params[prusa_key])
-            if prusa_key in (
+            array_keys = (
                 "bed_temperature", "first_layer_bed_temperature",
                 "temperature", "first_layer_temperature",
                 "filament_type", "filament_density", "filament_diameter",
                 "filament_cost", "filament_max_volumetric_speed",
                 "extrusion_multiplier",
-            ):
+            )
+            if prusa_key in array_keys:
                 data[orca_key] = [val]
             else:
                 data[orca_key] = val
 
-    data["compatible_printers"] = [f"{vendor} {printer_short} 0.4 nozzle"]
+    return data
 
-    return OrcaProfile(
-        type="filament",
-        name=name,
-        inherits=f"fdm_filament_{filament_type.lower()}",
-        from_field="system",
-        setting_id=make_setting_id(vendor, "filament", name),
-        data=data,
-    )
+
+def build_bundle_structure(
+    printer_name: str,
+    printer_files: List[str],
+    process_files: List[str],
+    filament_files: List[str],
+) -> Dict[str, Any]:
+    """Build bundle_structure.json manifest."""
+    import datetime
+    ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    safe_name = "".join(c for c in printer_name if c.isalnum() or c in " _-")
+    return {
+        "bundle_id": f"_{safe_name}_{ts}",
+        "bundle_type": "printer config bundle",
+        "printer_config": printer_files,
+        "process_config": process_files,
+        "filament_config": filament_files,
+        "version": ORCA_VERSION,
+    }
 
 
 def _map_quality_name(section_name: str, layer_height: str) -> str:

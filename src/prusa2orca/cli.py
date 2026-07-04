@@ -1,41 +1,40 @@
 """
 CLI entry point for prusa2orca.
-Vendor-agnostic. No local .ini files required — fetches from PrusaSlicer GitHub.
+Generates .orca_printer bundles — import directly in OrcaSlicer.
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import logging
+import os
 import sys
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from .assets import (
-    download_asset,
     find_assets_for_printer,
     generate_bed_texture,
     make_orca_asset_name,
 )
-from .mapper import (
-    convert_value,
-    get_parameter_map,
-    sanitize_profile_name,
-)
-from .models import OrcaProfile, PrusaSection, SectionType
+from .mapper import convert_value
+from .models import PrusaSection, SectionType
 from .orca_builder import (
+    build_bundle_structure,
     build_filament_json,
     build_machine_json,
-    build_machine_model_json,
     build_process_json,
     find_printer_model_section,
     find_printer_sections,
     vendor_slug,
+    ORCA_VERSION,
 )
 from .parser import (
     classify_section,
-    filter_by_printer,
     parse_ini,
     resolve_all,
     resolve_inherits,
@@ -58,21 +57,10 @@ def setup_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
     )
 
-def write_json(profile: OrcaProfile, output_dir: Path):
-    """Write a single Orca profile to a JSON file."""
-    data = {"type": profile.type, "name": profile.name}
-    if profile.inherits:
-        data["inherits"] = profile.inherits
-    data["instantiation"] = profile.instantiation
 
-    data.update(profile.data)
-    data["from"] = "user"  # always user, safe to import and update-safe
-    safe_name = "".join(c for c in profile.name if c.isalnum() or c in " @.-_()").strip()
-    filepath = output_dir / f"{safe_name}.json"
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-    log.info(f"  → {filepath.relative_to(output_dir.parent)}")
+def _safe_fn(name: str) -> str:
+    """Filesystem-safe filename."""
+    return "".join(c for c in name if c.isalnum() or c in " @.-_()").strip()
 
 
 # ─────────── COMMANDS ───────────
@@ -84,7 +72,6 @@ def cmd_vendors(args: argparse.Namespace):
     if not vendors:
         log.error("Could not fetch vendor list (no internet?)")
         sys.exit(1)
-
     print(f"\nAvailable vendors ({len(vendors)}):\n")
     for v in vendors:
         print(f"  {v}")
@@ -94,55 +81,49 @@ def cmd_vendors(args: argparse.Namespace):
 
 def cmd_list_printers(args: argparse.Namespace):
     """List all printer models for a vendor."""
-    vendor = args.vendor
-    printers = list_printers(vendor)
-
+    printers = list_printers(args.vendor)
     if not printers:
-        log.error(f"No printer models found for vendor '{vendor}'")
+        log.error(f"No printer models found for vendor '{args.vendor}'")
         sys.exit(1)
-
     print(f"\n{'Printer Model':50s} {'Internal Key':25s} {'Family':15s} {'Nozzles'}")
     print("-" * 110)
     for p in printers:
         print(f"{p['display_name']:50s} {p['internal_name']:25s} {p['family']:15s} {p['variants']}")
-    print(f"\nTotal: {len(printers)} printer models")
-    print(f"Usage: prusa2orca convert {vendor} -p \"<Printer Model>\" -o ./profiles")
 
 
 def cmd_convert(args: argparse.Namespace):
-    """Convert a printer's profiles from PrusaSlicer to OrcaSlicer."""
+    """Convert a printer's profiles to an .orca_printer bundle."""
     vendor: str = args.vendor
     printer_name: str = args.printer
-    output_dir: Path = args.output
-    as_user: bool = getattr(args, 'as_user', False)
+    output_path: Path = args.output
 
-    # Inherits targets
-    machine_inherits = args.machine_inherits or f"fdm_{vendor.lower()}_common"
-    process_inherits = args.process_inherits or f"fdm_process_{vendor.lower()}_common"
-
-    # Download the INI file
+    # Download ini
     ini_path = get_ini(vendor, force_refetch=args.refetch)
     if not ini_path:
         log.error(f"Could not fetch {vendor}.ini from PrusaSlicer GitHub")
         sys.exit(1)
 
-    log.info(f"Reading {vendor}.ini ({ini_path})")
+    log.info(f"Reading {vendor}.ini")
     sections = parse_ini(ini_path)
-    log.info(f"  Found {len(sections)} sections")
-
-    log.info("Resolving inheritance chains...")
     resolved = resolve_all(sections)
-    log.info(f"  Resolved {len(resolved)} concrete profiles")
+    log.info(f"  {len(resolved)} profiles after inheritance resolution")
 
-    # Filter by printer
-    log.info(f"Filtering for printer: {printer_name}")
-    pm_key = _find_printer_model_key(sections, printer_name)
+    # Find printer model
+    pm_section = find_printer_model_section(sections, printer_name)
+    pm_key = pm_section.profile_name if pm_section else None
+    printer_display = pm_section.params.get("name", printer_name) if pm_section else printer_name
+
+    if pm_section:
+        log.info(f"Found printer model: {printer_display}")
+
+    # Filter profiles for this printer
     if printer_name.startswith(vendor):
         printer_short = printer_name[len(vendor) + 1:]
     else:
         printer_short = printer_name
 
     target_nozzle = args.nozzle or "0.4"
+
     filtered = {}
     for raw_name, params in resolved.items():
         section = sections.get(raw_name)
@@ -154,35 +135,22 @@ def cmd_convert(args: argparse.Namespace):
                 filtered[raw_name] = params
             continue
         if section.section_type == SectionType.PRINT:
-            profile_name = section.profile_name if section else raw_name
-            if f"{target_nozzle} mm nozzle" in profile_name or f"({target_nozzle} " in profile_name:
+            pn = section.profile_name if section else raw_name
+            if f"{target_nozzle} mm nozzle" in pn or f"({target_nozzle} " in pn:
                 filtered[raw_name] = params
             continue
         if section.section_type == SectionType.FILAMENT:
             filtered[raw_name] = params
 
-    log.info(f"  {len(filtered)} relevant profiles")
+    log.info(f"  {len(filtered)} relevant profiles for '{printer_name}' ({target_nozzle}mm)")
 
-    # Setup output dirs
-    machine_dir = output_dir / "machine"
-    process_dir = output_dir / "process"
-    filament_dir = output_dir / "filament"
-    for d in (machine_dir, process_dir, filament_dir):
-        d.mkdir(parents=True, exist_ok=True)
+    # Build profile dicts (user format)
+    printer_dicts: List[tuple] = []     # (subdir, filename, data)
+    process_dicts: List[tuple] = []
+    filament_dicts: List[tuple] = []
 
-    # Find printer model section
-    pm_section = find_printer_model_section(sections, printer_name)
+    # Machine variants
     if pm_section:
-        log.info(f"Found printer model: {pm_section.params.get('name', '?')}")
-
-    # Generate machine_model JSON
-    if pm_section:
-        mm_profile = build_machine_model_json(pm_section, vendor)
-        write_json(mm_profile, machine_dir)
-
-    # Generate machine variant JSONs
-    if pm_section and printer_name:
-        printer_display = pm_section.params.get("name", printer_name)
         pr_sections = find_printer_sections(sections, pm_section.profile_name)
         seen = set()
         for ps in pr_sections:
@@ -190,109 +158,97 @@ def cmd_convert(args: argparse.Namespace):
                 continue
             rp = resolve_inherits(ps, sections)
             nozzle = rp.get("nozzle_diameter", "0.4")
-            key = (printer_display, nozzle)
-            if key in seen:
+            if (printer_display, nozzle) in seen:
                 continue
-            seen.add(key)
-            write_json(
-                build_machine_json(rp, printer_display, vendor, inherits_target=machine_inherits),
-                machine_dir,
-            )
+            seen.add((printer_display, nozzle))
+            data = build_machine_json(rp, printer_display, vendor)
+            fn = _safe_fn(data["name"])
+            printer_dicts.append(("printer", fn, data))
 
-    # Fallback: generate from filtered
-    if not list(machine_dir.glob("*nozzle*.json")):
-        log.info("No explicit printer sections found, generating from resolved params")
+    # Fallback
+    if not printer_dicts:
         for raw_name, rp in filtered.items():
             section = sections.get(raw_name)
             if section and section.section_type == SectionType.PRINTER and not section.is_template():
                 display_name = section.params.get("renamed_from", section.profile_name)
-                write_json(
-                    build_machine_json(
-                        rp,
-                        display_name.strip('"') if isinstance(display_name, str) else str(display_name),
-                        vendor,
-                        inherits_target=machine_inherits,
-                    ),
-                    machine_dir,
+                data = build_machine_json(
+                    rp,
+                    display_name.strip('"') if isinstance(display_name, str) else str(display_name),
+                    vendor,
                 )
+                fn = _safe_fn(data["name"])
+                printer_dicts.append(("printer", fn, data))
 
     # Process profiles
-    process_count = 0
     seen_process = set()
     for raw_name, rp in sorted(filtered.items()):
         section = sections.get(raw_name)
         if section and section.section_type == SectionType.PRINT and not section.is_template():
-            if printer_name:
-                notes = _get_printer_notes(sections, printer_name)
-                if "HIGHSPEED" in raw_name.upper() and "HIGHSPEED" not in notes:
-                    continue
-                if "SUPERSPEED" in raw_name.upper() and "SUPERSPEED" not in notes:
-                    continue
-                pp = build_process_json(rp, section.profile_name, printer_name, vendor,
-                                        inherits_target=process_inherits)
-                if pp.name in seen_process:
-                    continue
-                seen_process.add(pp.name)
-                write_json(pp, process_dir)
-                process_count += 1
-    log.info(f"Generated {process_count} process profiles")
+            notes = _get_printer_notes(sections, printer_name)
+            if "HIGHSPEED" in raw_name.upper() and "HIGHSPEED" not in notes:
+                continue
+            if "SUPERSPEED" in raw_name.upper() and "SUPERSPEED" not in notes:
+                continue
+            data = build_process_json(rp, section.profile_name, printer_name, vendor)
+            if data["name"] in seen_process:
+                continue
+            seen_process.add(data["name"])
+            fn = _safe_fn(data["name"])
+            process_dicts.append(("process", fn, data))
 
     # Filament profiles
-    filament_count = 0
     seen_filament = set()
     for raw_name, rp in sorted(filtered.items()):
         section = sections.get(raw_name)
         if section and section.section_type == SectionType.FILAMENT and not section.is_template():
-            if printer_name:
-                fp = build_filament_json(rp, section.profile_name, printer_name, vendor)
-                if fp.name in seen_filament:
-                    continue
-                seen_filament.add(fp.name)
-                write_json(fp, filament_dir)
-                filament_count += 1
-    log.info(f"Generated {filament_count} filament profiles")
+            data = build_filament_json(rp, section.profile_name, printer_name, vendor)
+            if data["name"] in seen_filament:
+                continue
+            seen_filament.add(data["name"])
+            fn = _safe_fn(data["name"])
+            filament_dicts.append(("filament", fn, data))
 
-    # Assets
-    if printer_name:
-        log.info("Extracting printer assets...")
-        assets = find_assets_for_printer(sections, printer_name)
-        bed_dims = _get_bed_dimensions(sections, printer_name)
-        vdir = get_vendor_dir(vendor)
+    # Build bundle
+    printer_rel = [f"printer/{fn}.json" for _, fn, _ in printer_dicts]
+    process_rel = [f"process/{fn}.json" for _, fn, _ in process_dicts]
+    filament_rel = [f"filament/{fn}.json" for _, fn, _ in filament_dicts]
 
-        if assets.get("bed_model"):
-            fn = assets["bed_model"]
-            orca_name = make_orca_asset_name(fn, printer_name, vendor)
-            out = machine_dir / orca_name
-            if not out.exists():
-                result = download_asset(fn, vdir, machine_dir, printer_name, vendor)
-                if not result:
-                    log.info(f"  ℹ No {fn} in PrusaSlicer repo — skipping")
+    bundle = build_bundle_structure(printer_name, printer_rel, process_rel, filament_rel)
 
-        if assets.get("bed_texture"):
-            fn = assets["bed_texture"]
-            orca_name = make_orca_asset_name(fn, printer_name, vendor)
-            out = machine_dir / orca_name
-            if not out.exists():
-                result = download_asset(fn, vdir, machine_dir, printer_name, vendor)
-                if not result:
-                    generate_bed_texture(out, bed_dims[0], bed_dims[1])
+    # Create .orca_printer ZIP
+    safe_output = output_path
+    if not safe_output.suffix:
+        safe_output = output_path / f"{vendor} {printer_short}.orca_printer"
 
-        if assets.get("thumbnail"):
-            fn = assets["thumbnail"]
-            orca_name = make_orca_asset_name(fn, printer_name, vendor)
-            out = machine_dir / orca_name
-            if not out.exists():
-                result = download_asset(fn, vdir, machine_dir, printer_name, vendor)
-                if not result:
-                    log.info(f"  ℹ No {fn} in PrusaSlicer repo — skipping")
+    safe_output.parent.mkdir(parents=True, exist_ok=True)
 
-    total = _count_files(output_dir)
-    log.info(f"\nDone! {total} files written to {output_dir}/")
-    log.info("Import in OrcaSlicer: File → Import → Import Configs → select all .json files")
+    with zipfile.ZipFile(safe_output, "w", zipfile.ZIP_DEFLATED) as zf:
+        # bundle_structure.json
+        zf.writestr("bundle_structure.json", json.dumps(bundle, indent=4))
+
+        # Printer JSONs
+        for subdir, fn, data in printer_dicts:
+            zf.writestr(f"printer/{fn}.json", json.dumps(data, indent=4))
+            log.info(f"  + printer/{fn}.json")
+
+        # Process JSONs
+        for subdir, fn, data in process_dicts:
+            zf.writestr(f"process/{fn}.json", json.dumps(data, indent=4))
+            log.info(f"  + process/{fn}.json")
+
+        # Filament JSONs
+        for subdir, fn, data in filament_dicts:
+            zf.writestr(f"filament/{fn}.json", json.dumps(data, indent=4))
+            log.info(f"  + filament/{fn}.json")
+
+    total = len(printer_dicts) + len(process_dicts) + len(filament_dicts)
+    log.info(f"\nDone! {total} profiles → {safe_output}")
+    log.info(f"Import: File → Import → Import Configs → select {safe_output}")
+    log.info(f"Or drag & drop the file onto OrcaSlicer")
 
 
 def cmd_assets(args: argparse.Namespace):
-    """Download or generate printer assets."""
+    """Download or generate bed model, texture, and thumbnail."""
     vendor: str = args.vendor
     printer_name: str = args.printer
     output_dir: Path = args.output
@@ -305,28 +261,29 @@ def cmd_assets(args: argparse.Namespace):
     sections = parse_ini(ini_path)
     assets = find_assets_for_printer(sections, printer_name)
     if not assets:
-        log.error(f"No assets found for printer: {printer_name}")
+        log.error(f"No assets found for: {printer_name}")
         return
 
     vdir = get_vendor_dir(vendor)
-    log.info(f"Assets for {printer_name}:")
     for kind, filename in assets.items():
         if filename:
             orca_name = make_orca_asset_name(filename, printer_name, vendor)
-            log.info(f"  {kind}: {filename} → {orca_name}")
+            log.info(f"  {kind}: {orca_name}")
 
-    result = download_asset(assets["bed_model"], vdir, output_dir / "machine", printer_name, vendor)
+    from .assets import download_asset
+    result = download_asset(assets["bed_model"], vdir, output_dir, printer_name, vendor)
     if result:
         log.info(f"  ✓ Bed model: {result.name}")
 
     orca_name = make_orca_asset_name(assets["bed_texture"], printer_name, vendor)
-    texture_path = output_dir / "machine" / orca_name
-    result = download_asset(assets["bed_texture"], vdir, output_dir / "machine", printer_name, vendor)
+    texture_path = output_dir / orca_name
+    from .assets import download_asset as dl
+    result = dl(assets["bed_texture"], vdir, output_dir, printer_name, vendor)
     if not result:
         bed_dims = _get_bed_dimensions(sections, printer_name)
         generate_bed_texture(texture_path, bed_dims[0], bed_dims[1])
 
-    download_asset(assets["thumbnail"], vdir, output_dir / "machine", printer_name, vendor)
+    dl(assets["thumbnail"], vdir, output_dir, printer_name, vendor)
 
 
 # ─────────── HELPERS ───────────
@@ -352,19 +309,6 @@ def _get_bed_dimensions(sections, printer_name):
     return 300, 225
 
 
-def _find_printer_model_key(sections, printer_name):
-    for raw_name, section in sections.items():
-        if section.section_type == SectionType.PRINTER_MODEL:
-            display = section.params.get("name", "")
-            if display == printer_name or section.profile_name == printer_name:
-                return section.profile_name
-    for raw_name, section in sections.items():
-        if section.section_type == SectionType.PRINTER_MODEL:
-            if section.profile_name in printer_name.upper():
-                return section.profile_name
-    return printer_name.upper().replace(" ", "").replace("-", "")
-
-
 def _get_printer_notes(sections, printer_name):
     for raw_name, section in sections.items():
         if section.section_type == SectionType.PRINTER and not section.is_template():
@@ -374,65 +318,54 @@ def _get_printer_notes(sections, printer_name):
     return ""
 
 
-def _count_files(directory: Path) -> int:
-    return len(list(directory.rglob("*.json")))
-
-
 # ─────────── MAIN ───────────
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert PrusaSlicer profiles to OrcaSlicer format.\n"
-                    "No local .ini files required — fetches from PrusaSlicer GitHub.",
+        description="Convert PrusaSlicer profiles to OrcaSlicer .orca_printer bundles.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  prusa2orca list vendors
-  prusa2orca list printers Creality
-  prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles
-  prusa2orca convert Voron -p "Voron V2.4" --machine-inherits fdm_machine_common -o ./voron
-  prusa2orca assets Creality -p "Creality CR-5 Pro H" -o ./profiles
+  prusa2orca vendors
+  prusa2orca list Creality
+  prusa2orca convert Creality -p "CR-5 Pro H" -o ./CR-5-Pro-H.orca_printer
+  prusa2orca convert Voron -p "Voron V2.4 350" -o ./Voron24.orca_printer
         """,
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # ── list vendors ──
-    sub.add_parser("vendors", help="List available printer vendors from PrusaSlicer source")
+    sub.add_parser("vendors", help="List available printer vendors")
 
-    # ── list printers ──
     list_p = sub.add_parser("list", help="List printer models for a vendor")
-    list_p.add_argument("vendor", type=str, help="Vendor name (e.g. Creality, Voron, Anycubic)")
+    list_p.add_argument("vendor", type=str, help="Vendor name")
 
-    # ── convert ──
-    conv_p = sub.add_parser("convert", help="Convert a printer's profiles to OrcaSlicer JSON")
-    conv_p.add_argument("vendor", type=str, help="Vendor name (e.g. Creality, Voron, Anycubic)")
-    conv_p.add_argument("-p", "--printer", type=str, required=True,
-                        help="Printer model name (e.g. 'Creality CR-5 Pro H')")
-    conv_p.add_argument("-o", "--output", type=Path, default=Path("./orca_profiles"),
-                        help="Output directory")
-    conv_p.add_argument("--nozzle", type=str, default="0.4",
-                        help="Target nozzle diameter (default: 0.4)")
-    conv_p.add_argument("--machine-inherits", type=str, default=None,
-                        help="Orca machine base profile (default: fdm_{vendor}_common)")
-    conv_p.add_argument("--process-inherits", type=str, default=None,
-                        help="Orca process base profile (default: fdm_process_{vendor}_common)")
-    conv_p.add_argument("--refetch", action="store_true",
-                        help="Force re-download of the vendor .ini file")
+    conv_p = sub.add_parser("convert", help="Convert to .orca_printer bundle")
+    conv_p.add_argument("vendor", type=str, help="Vendor name")
+    conv_p.add_argument("-p", "--printer", type=str, required=True, help="Printer model name")
+    conv_p.add_argument("-o", "--output", type=Path, default=None,
+                        help="Output path (.orca_printer file, or directory)")
+    conv_p.add_argument("--nozzle", type=str, default="0.4", help="Target nozzle (default: 0.4)")
+    conv_p.add_argument("--refetch", action="store_true", help="Force re-download vendor .ini")
 
-
-    # ── assets ──
     assets_p = sub.add_parser("assets", help="Download bed models and textures")
     assets_p.add_argument("vendor", type=str, help="Vendor name")
-    assets_p.add_argument("-p", "--printer", type=str, required=True,
-                          help="Printer model name")
-    assets_p.add_argument("-o", "--output", type=Path, default=Path("./orca_profiles"),
-                          help="Output directory")
+    assets_p.add_argument("-p", "--printer", type=str, required=True, help="Printer model name")
+    assets_p.add_argument("-o", "--output", type=Path, default=Path("."), help="Output directory")
 
     args = parser.parse_args()
     setup_logging(args.verbose)
+
+    # Auto-detect vendor from printer name
+    if hasattr(args, 'vendor') and not args.vendor and hasattr(args, 'printer') and args.printer:
+        args.vendor = args.printer.split()[0] if ' ' in args.printer else args.printer
+
+    # Default output: .orca_printer file next to cwd
+    if hasattr(args, 'output') and args.output is None and args.command == 'convert':
+        safe_name = _safe_fn(args.printer)
+        args.output = Path(f"{args.vendor} {safe_name}.orca_printer")
 
     try:
         if args.command == "vendors":
