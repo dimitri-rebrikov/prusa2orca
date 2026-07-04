@@ -288,14 +288,7 @@ def cmd_convert(args: argparse.Namespace):
 
     total = _count_files(output_dir)
     log.info(f"\nDone! {total} files written to {output_dir}/")
-    install_path = f"~/.config/OrcaSlicer/system/{vendor}/"
-    user_dir = Path.home() / ".config" / "OrcaSlicer" / "user"
-    uid_dirs = sorted(user_dir.iterdir()) if user_dir.exists() else []
-    if uid_dirs:
-        target = uid_dirs[0] / vendor.lower()
-        log.info(f"Install: mkdir -p {target} && cp -ri machine/ process/ filament/ {target}")
-    else:
-        log.info("Install: open Orca, then copy into ~/.config/OrcaSlicer/user/<UID>/")
+    log.info("Import in OrcaSlicer: File → Import → Import Configs → select all .json files")
 
 
 def cmd_assets(args: argparse.Namespace):
