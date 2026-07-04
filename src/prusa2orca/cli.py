@@ -58,17 +58,15 @@ def setup_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
     )
 
-def write_json(profile: OrcaProfile, output_dir: Path, as_user: bool = False):
+def write_json(profile: OrcaProfile, output_dir: Path):
     """Write a single Orca profile to a JSON file."""
     data = {"type": profile.type, "name": profile.name}
     if profile.inherits:
         data["inherits"] = profile.inherits
-    data["from"] = "user" if as_user else profile.from_field
-    if profile.setting_id:
-        data["setting_id"] = profile.setting_id
     data["instantiation"] = profile.instantiation
-    data.update(profile.data)
 
+    data.update(profile.data)
+    data["from"] = "user"  # always user, safe to import and update-safe
     safe_name = "".join(c for c in profile.name if c.isalnum() or c in " @.-_()").strip()
     filepath = output_dir / f"{safe_name}.json"
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -181,7 +179,7 @@ def cmd_convert(args: argparse.Namespace):
     # Generate machine_model JSON
     if pm_section:
         mm_profile = build_machine_model_json(pm_section, vendor)
-        write_json(mm_profile, machine_dir, as_user=as_user)
+        write_json(mm_profile, machine_dir)
 
     # Generate machine variant JSONs
     if pm_section and printer_name:
@@ -199,7 +197,7 @@ def cmd_convert(args: argparse.Namespace):
             seen.add(key)
             write_json(
                 build_machine_json(rp, printer_display, vendor, inherits_target=machine_inherits),
-                machine_dir, as_user=as_user,
+                machine_dir,
             )
 
     # Fallback: generate from filtered
@@ -216,7 +214,7 @@ def cmd_convert(args: argparse.Namespace):
                         vendor,
                         inherits_target=machine_inherits,
                     ),
-                    machine_dir, as_user=as_user,
+                    machine_dir,
                 )
 
     # Process profiles
@@ -236,7 +234,7 @@ def cmd_convert(args: argparse.Namespace):
                 if pp.name in seen_process:
                     continue
                 seen_process.add(pp.name)
-                write_json(pp, process_dir, as_user=as_user)
+                write_json(pp, process_dir)
                 process_count += 1
     log.info(f"Generated {process_count} process profiles")
 
@@ -251,7 +249,7 @@ def cmd_convert(args: argparse.Namespace):
                 if fp.name in seen_filament:
                     continue
                 seen_filament.add(fp.name)
-                write_json(fp, filament_dir, as_user=as_user)
+                write_json(fp, filament_dir)
                 filament_count += 1
     log.info(f"Generated {filament_count} filament profiles")
 
@@ -288,7 +286,13 @@ def cmd_convert(args: argparse.Namespace):
     total = _count_files(output_dir)
     log.info(f"\nDone! {total} files written to {output_dir}/")
     install_path = f"~/.config/OrcaSlicer/system/{vendor}/"
-    log.info(f"Install: mkdir -p {install_path} && cp -ri machine/ process/ filament/ {install_path}")
+    user_dir = Path.home() / ".config" / "OrcaSlicer" / "user"
+    uid_dirs = sorted(user_dir.iterdir()) if user_dir.exists() else []
+    if uid_dirs:
+        target = uid_dirs[0] / vendor.lower()
+        log.info(f"Install: mkdir -p {target} && cp -ri machine/ process/ filament/ {target}")
+    else:
+        log.info("Install: open Orca, then copy into ~/.config/OrcaSlicer/user/<UID>/")
 
 
 def cmd_assets(args: argparse.Namespace):
@@ -423,8 +427,7 @@ Examples:
                         help="Skip downloading bed models/textures")
     conv_p.add_argument("--refetch", action="store_true",
                         help="Force re-download of the vendor .ini file")
-    conv_p.add_argument("--as-user", action="store_true",
-                        help="Set 'from': 'user' instead of 'system' (allows Import Configs)")
+
 
     # ── assets ──
     assets_p = sub.add_parser("assets", help="Download bed models and textures")

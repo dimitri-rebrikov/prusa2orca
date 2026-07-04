@@ -58,8 +58,8 @@ uv run prusa2orca assets Creality -p "Creality CR-5 Pro H" -o ./profiles
 ### Import directly via OrcaSlicer UI
 
 ```bash
-# Generate with 'from': 'user' instead of 'system'
-uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles --as-user
+# Generate with 'from': 'user' (default)
+uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles
 
 # Then in OrcaSlicer: File → Import → Import Configs → select all .json files
 ```
@@ -100,27 +100,25 @@ profiles/
 
 ## Installation in OrcaSlicer
 
+**Methode 1 — Per UI importieren (empfohlen):**
+
 ```bash
-# 1. OrcaSlicer schließen
-
-# 2. Profile ins system-Verzeichnis kopieren
-mkdir -p ~/.config/OrcaSlicer/system/Creality/machine
-mkdir -p ~/.config/OrcaSlicer/system/Creality/process
-mkdir -p ~/.config/OrcaSlicer/system/Creality/filament
-
-cp -i machine/*.json           ~/.config/OrcaSlicer/system/Creality/machine/
-cp -i process/*.json           ~/.config/OrcaSlicer/system/Creality/process/
-cp -i filament/*.json          ~/.config/OrcaSlicer/system/Creality/filament/
-cp -i machine/*.stl machine/*.svg machine/*.png \
-     ~/.config/OrcaSlicer/system/Creality/machine/
-
-# 3. OrcaSlicer starten
+uv run prusa2orca convert Creality -p "CR-5 Pro H" -o ./profiles
+# OrcaSlicer → File → Import → Import Configs → alle .json auswählen
 ```
 
-> **Hinweis:** `cp -i` fragt vor Überschreiben. Alte Profile bleiben erhalten.
-> Falls Profile nach dem Start nicht auftauchen: *Help → Show Configuration Folder*,
-> das `system/`-Verzeichnis öffnen und **nur die neuen JSON-Dateien dort ablegen**,
-> ohne das ganze Verzeichnis zu löschen.
+**Methode 2 — Direkt ins User-Verzeichnis kopieren:**
+
+```bash
+# Orca einmal starten → schließen (damit User-Ordner existiert)
+uv run prusa2orca convert Creality -p "CR-5 Pro H" -o ./profiles
+
+UID=$(ls ~/.config/OrcaSlicer/user/ | head -1)
+mkdir -p ~/.config/OrcaSlicer/user/$UID/creality
+cp -ri profiles/* ~/.config/OrcaSlicer/user/$UID/creality/
+```
+
+> Beide Methoden legen Profile als `"from": "user"` an → **update-sicher** und via `Import Configs` kompatibel.
 
 ## How it works
 
