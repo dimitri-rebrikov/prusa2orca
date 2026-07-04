@@ -58,12 +58,12 @@ def setup_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
     )
 
-
-def write_json(profile: OrcaProfile, output_dir: Path):
+def write_json(profile: OrcaProfile, output_dir: Path, as_user: bool = False):
+    """Write a single Orca profile to a JSON file."""
     data = {"type": profile.type, "name": profile.name}
     if profile.inherits:
         data["inherits"] = profile.inherits
-    data["from"] = profile.from_field
+    data["from"] = "user" if as_user else profile.from_field
     if profile.setting_id:
         data["setting_id"] = profile.setting_id
     data["instantiation"] = profile.instantiation
@@ -117,6 +117,7 @@ def cmd_convert(args: argparse.Namespace):
     printer_name: str = args.printer
     output_dir: Path = args.output
     extract_assets: bool = not args.no_assets
+    as_user: bool = getattr(args, 'as_user', False)
 
     # Inherits targets
     machine_inherits = args.machine_inherits or f"fdm_{vendor.lower()}_common"
@@ -180,7 +181,7 @@ def cmd_convert(args: argparse.Namespace):
     # Generate machine_model JSON
     if pm_section:
         mm_profile = build_machine_model_json(pm_section, vendor)
-        write_json(mm_profile, machine_dir)
+        write_json(mm_profile, machine_dir, as_user=as_user)
 
     # Generate machine variant JSONs
     if pm_section and printer_name:
@@ -198,7 +199,7 @@ def cmd_convert(args: argparse.Namespace):
             seen.add(key)
             write_json(
                 build_machine_json(rp, printer_display, vendor, inherits_target=machine_inherits),
-                machine_dir,
+                machine_dir, as_user=as_user,
             )
 
     # Fallback: generate from filtered
@@ -215,7 +216,7 @@ def cmd_convert(args: argparse.Namespace):
                         vendor,
                         inherits_target=machine_inherits,
                     ),
-                    machine_dir,
+                    machine_dir, as_user=as_user,
                 )
 
     # Process profiles
@@ -235,7 +236,7 @@ def cmd_convert(args: argparse.Namespace):
                 if pp.name in seen_process:
                     continue
                 seen_process.add(pp.name)
-                write_json(pp, process_dir)
+                write_json(pp, process_dir, as_user=as_user)
                 process_count += 1
     log.info(f"Generated {process_count} process profiles")
 
@@ -250,7 +251,7 @@ def cmd_convert(args: argparse.Namespace):
                 if fp.name in seen_filament:
                     continue
                 seen_filament.add(fp.name)
-                write_json(fp, filament_dir)
+                write_json(fp, filament_dir, as_user=as_user)
                 filament_count += 1
     log.info(f"Generated {filament_count} filament profiles")
 
@@ -422,6 +423,8 @@ Examples:
                         help="Skip downloading bed models/textures")
     conv_p.add_argument("--refetch", action="store_true",
                         help="Force re-download of the vendor .ini file")
+    conv_p.add_argument("--as-user", action="store_true",
+                        help="Set 'from': 'user' instead of 'system' (allows Import Configs)")
 
     # ── assets ──
     assets_p = sub.add_parser("assets", help="Download bed models and textures")

@@ -54,6 +54,15 @@ uv run prusa2orca convert Voron -p "Voron V2.4 350" \
 
 ```bash
 uv run prusa2orca assets Creality -p "Creality CR-5 Pro H" -o ./profiles
+
+### Import directly via OrcaSlicer UI
+
+```bash
+# Generate with 'from': 'user' instead of 'system'
+uv run prusa2orca convert Creality -p "Creality CR-5 Pro H" -o ./profiles --as-user
+
+# Then in OrcaSlicer: File → Import → Import Configs → select all .json files
+```
 ```
 
 ### Options
