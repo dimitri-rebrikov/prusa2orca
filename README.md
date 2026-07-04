@@ -62,7 +62,6 @@ uv run prusa2orca convert Voron -p "Voron V2.4 350" \
 | `--nozzle` | Target nozzle diameter (default: `0.4`) |
 | `--machine-inherits` | Orca machine base profile (default: auto-detect) |
 | `--process-inherits` | Orca process base profile (default: auto-detect) |
-| `--no-assets` | Skip asset download |
 | `--refetch` | Force re-download of the vendor .ini |
 | `-v` | Verbose logging |
 

@@ -114,7 +114,6 @@ def cmd_convert(args: argparse.Namespace):
     vendor: str = args.vendor
     printer_name: str = args.printer
     output_dir: Path = args.output
-    extract_assets: bool = not args.no_assets
     as_user: bool = getattr(args, 'as_user', False)
 
     # Inherits targets
@@ -254,7 +253,7 @@ def cmd_convert(args: argparse.Namespace):
     log.info(f"Generated {filament_count} filament profiles")
 
     # Assets
-    if extract_assets and printer_name:
+    if printer_name:
         log.info("Extracting printer assets...")
         assets = find_assets_for_printer(sections, printer_name)
         bed_dims = _get_bed_dimensions(sections, printer_name)
@@ -265,7 +264,9 @@ def cmd_convert(args: argparse.Namespace):
             orca_name = make_orca_asset_name(fn, printer_name, vendor)
             out = machine_dir / orca_name
             if not out.exists():
-                download_asset(fn, vdir, machine_dir, printer_name, vendor)
+                result = download_asset(fn, vdir, machine_dir, printer_name, vendor)
+                if not result:
+                    log.info(f"  ℹ No {fn} in PrusaSlicer repo — skipping")
 
         if assets.get("bed_texture"):
             fn = assets["bed_texture"]
@@ -281,7 +282,9 @@ def cmd_convert(args: argparse.Namespace):
             orca_name = make_orca_asset_name(fn, printer_name, vendor)
             out = machine_dir / orca_name
             if not out.exists():
-                download_asset(fn, vdir, machine_dir, printer_name, vendor)
+                result = download_asset(fn, vdir, machine_dir, printer_name, vendor)
+                if not result:
+                    log.info(f"  ℹ No {fn} in PrusaSlicer repo — skipping")
 
     total = _count_files(output_dir)
     log.info(f"\nDone! {total} files written to {output_dir}/")
@@ -423,8 +426,6 @@ Examples:
                         help="Orca machine base profile (default: fdm_{vendor}_common)")
     conv_p.add_argument("--process-inherits", type=str, default=None,
                         help="Orca process base profile (default: fdm_process_{vendor}_common)")
-    conv_p.add_argument("--no-assets", action="store_true",
-                        help="Skip downloading bed models/textures")
     conv_p.add_argument("--refetch", action="store_true",
                         help="Force re-download of the vendor .ini file")
 
