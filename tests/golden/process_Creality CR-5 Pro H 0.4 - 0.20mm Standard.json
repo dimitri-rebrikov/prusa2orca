@@ -1,7 +1,7 @@
 {
     "from": "User",
-    "name": "0.20mm Standard @Creality CR-5 Pro H 0.4",
-    "print_settings_id": "0.20mm Standard @Creality CR-5 Pro H 0.4",
+    "name": "Creality CR-5 Pro H 0.4 - 0.20mm Standard",
+    "print_settings_id": "Creality CR-5 Pro H 0.4 - 0.20mm Standard",
     "is_custom_defined": "0",
     "version": "2.3.1.10",
     "inherits": "fdm_process_common",

@@ -105,6 +105,8 @@ def test_convert_creality_cr5proh():
     assert pr.get("layer_height") == "0.20"
     assert pr.get("inherits") == "fdm_process_common", \
         f"Process inherits should reference base, got: {pr.get('inherits')}"
+    assert pr["name"].startswith("Creality CR-5 Pro H"), \
+        f"Process name should start with printer name: {pr['name']}"
 
     # Filament
     filament_key = [k for k in bundle if k.startswith("filament/") and "PLA" in k]
@@ -112,6 +114,8 @@ def test_convert_creality_cr5proh():
     f = bundle[filament_key[0]]
     assert f["from"] == "User"
     assert f.get("filament_settings_id"), "filament_settings_id missing"
+    assert f["name"].startswith("Creality CR-5 Pro H"), \
+        f"Filament name should start with printer name: {f['name']}"
     assert f.get("nozzle_temperature") == ["200"]
 
 

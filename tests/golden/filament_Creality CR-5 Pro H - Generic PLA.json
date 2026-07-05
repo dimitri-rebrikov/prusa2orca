@@ -1,7 +1,7 @@
 {
     "from": "User",
-    "name": "Creality Generic PLA @Creality CR-5 Pro H",
-    "filament_settings_id": "Creality Generic PLA @Creality CR-5 Pro H",
+    "name": "Creality CR-5 Pro H - Generic PLA",
+    "filament_settings_id": "Creality CR-5 Pro H - Generic PLA",
     "is_custom_defined": "0",
     "version": "2.3.1.10",
     "inherits": "fdm_filament_pla",
@@ -12,10 +12,10 @@
         "60"
     ],
     "nozzle_temperature": [
-        "200"
+        "205"
     ],
     "nozzle_temperature_initial_layer": [
-        "205"
+        "210"
     ],
     "filament_type": [
         "PLA"
@@ -27,7 +27,7 @@
         "1.75"
     ],
     "filament_cost": [
-        "19.50"
+        "20"
     ],
     "filament_max_volumetric_speed": [
         "15"
@@ -35,8 +35,8 @@
     "filament_flow_ratio": [
         "1"
     ],
-    "default_filament_colour": "#FFE200",
-    "filament_vendor": "123-3D",
+    "default_filament_colour": "#DDDDDD",
+    "filament_vendor": "Generic",
     "reduce_fan_stop_start_freq": "1",
     "fan_cooling_layer_time": "1",
     "fan_max_speed": "100",

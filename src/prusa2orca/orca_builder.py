@@ -180,7 +180,7 @@ def build_process_json(
     quality_name = _map_quality_name(section_name, layer_h)
 
     printer_short = _strip_vendor_prefix(printer_display_name, vendor)
-    name = f"{quality_name} @{vendor} {printer_short} {nozzle}"
+    name = f"{vendor} {printer_short} {nozzle} - {quality_name}"
 
     data = _user_meta(name, "print_settings_id", inherits="fdm_process_common")
 
@@ -204,7 +204,9 @@ def build_filament_json(
     """Build a filament dict from resolved params."""
     filament_type = resolved_params.get("filament_type", "PLA")
     printer_short = _strip_vendor_prefix(printer_display_name, vendor)
-    name = f"{vendor} Generic {filament_type} @{vendor} {printer_short}"
+    # Use original Prusa filament name (before @), prefix with printer
+    original = section_name.split("@")[0].strip() if "@" in section_name else section_name
+    name = f"{vendor} {printer_short} - {original}"
 
     data = _user_meta(name, "filament_settings_id",
                        inherits=f"fdm_filament_{filament_type.lower()}")
