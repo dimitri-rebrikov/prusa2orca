@@ -362,13 +362,14 @@ Source: [OrcaSlicer Wiki](https://www.orcaslicer.com/wiki/developer_reference/ho
 
 ## 12. Design Decisions for prusa2orca
 
-| Decision | Rationale |
+| Design Decision | Rationale |
 |----------|-----------|
 | **Remote INI fetching** | No local files needed — fetches from PrusaSlicer GitHub on demand |
 | **Vendor-agnostic** | Single codebase handles Creality, Voron, Anycubic, etc. |
 | **`.orca_printer` output** | Orca's native import format — drag & drop or Import Configs |
 | **User-format JSONs** | `"from": "User"` — update-safe, no system directory manipulation |
-| **Standalone profiles** (`inherits=""`) | Avoid dependency on system profiles that may not exist for all vendors |
-| **Acceleration expansion** | Prusa's single `default_acceleration` → all Orca per-move fields |
+| **Inherits from base profiles** | `inherits="fdm_process_common"` — fehlende Felder kommen vom Orca-Parent. **Nicht** `inherits=""` (standalone), das würde jedes fehlende Feld auf Orca-Intern-Default fallen lassen. |
+| **Prusa-Werte explizit übernommen** | Alle Werte aus der `.ini` werden trotzdem explizit gesetzt. `inherits` ist nur Sicherheitsnetz für Orca-Felder die Prusa nicht kennt. |
+| **Keine Wert-Expandierung** | Acceleration nicht künstlich auf alle Orca-Felder expandieren — fehlende Felder kommen sauber vom `fdm_process_common`-Parent. |
 | **No hardcoded fallbacks** | Every value must come from the Prusa source data |
 | **Deterministic filenames** | Profile names sanitized for cross-platform filesystem compatibility |
