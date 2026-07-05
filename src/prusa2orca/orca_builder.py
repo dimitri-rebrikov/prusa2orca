@@ -192,6 +192,19 @@ def build_process_json(
         if prusa_key in resolved_params and orca_key not in data:
             data[orca_key] = convert_value(prusa_key, resolved_params[prusa_key])
 
+    # Expand default_acceleration to all Orca acceleration fields
+    # (standalone profiles need explicit values, not just defaults)
+    accel = data.get("default_acceleration", "500")
+    for acc_key in (
+        "inner_wall_acceleration", "outer_wall_acceleration",
+        "initial_layer_acceleration", "top_surface_acceleration",
+        "sparse_infill_acceleration", "internal_solid_infill_acceleration",
+    ):
+        if acc_key not in data:
+            data[acc_key] = accel
+    if "travel_acceleration" not in data:
+        data["travel_acceleration"] = "700"
+
     return data
 
 
