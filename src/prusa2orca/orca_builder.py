@@ -102,7 +102,7 @@ def build_machine_json(
     display_name = _strip_vendor_prefix(printer_model_name, vendor)
     name = f"{vendor} {display_name} {nozzle} nozzle"
 
-    data = _user_meta(name, "printer_settings_id", inherits="")
+    data = _user_meta(name, "printer_settings_id", inherits="fdm_machine_common")
 
     # Orca-specific fields
     data["printer_model"] = f"{vendor} {display_name}"
@@ -182,7 +182,7 @@ def build_process_json(
     printer_short = _strip_vendor_prefix(printer_display_name, vendor)
     name = f"{quality_name} @{vendor} {printer_short} {nozzle}"
 
-    data = _user_meta(name, "print_settings_id", inherits="")
+    data = _user_meta(name, "print_settings_id", inherits="fdm_process_common")
 
     for prusa_key, orca_key in PRINT_PARAM_MAP.items():
         if prusa_key in resolved_params:
@@ -191,19 +191,6 @@ def build_process_json(
     for prusa_key, orca_key in FILAMENT_PARAM_MAP.items():
         if prusa_key in resolved_params and orca_key not in data:
             data[orca_key] = convert_value(prusa_key, resolved_params[prusa_key])
-
-    # Expand default_acceleration to all Orca acceleration fields.
-    # PrusaSlicer only has default_acceleration and bridge_acceleration;
-    # Orca splits this into per-move-type fields.
-    accel = data.get("default_acceleration")
-    if accel:
-        for acc_key in (
-            "inner_wall_acceleration", "outer_wall_acceleration",
-            "initial_layer_acceleration", "top_surface_acceleration",
-            "sparse_infill_acceleration", "internal_solid_infill_acceleration",
-        ):
-            if acc_key not in data:
-                data[acc_key] = accel
 
     return data
 
