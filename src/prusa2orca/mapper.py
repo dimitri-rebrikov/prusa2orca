@@ -255,22 +255,24 @@ def _convert_placeholders(gcode: str) -> str:
         "{print_time}": "[print_time]",
         "{layer_z}": "[layer_z]",
         "{max_layer_z}": "[max_layer_z]",
-        "{travel_speed*60}": "[travel_speed*60]",
         "{print_bed_max[1]*0.85}": "[print_bed_max[1]*0.85]",
         "{print_bed_max[1]*0.8}": "[print_bed_max[1]*0.8]",
     }
 
-    # Expression replacements (variables in expressions, not in brackets)
+    # Expressions in curly braces are valid in Orca (they're evaluated).
+    # Only convert `{var_name[0]}` → `[var_name]` (array access → simple ref).
+    # Keep math expressions like {travel_speed*60} as-is — Orca evaluates them.
+
+    for prusa, orca in replacements.items():
+        gcode = gcode.replace(prusa, orca)
+
+    # Expression replacements: max_print_height → printable_height
     expr_replacements = {
         "{z_offset+min(max_layer_z+2, max_print_height)}": "z_offset+min(max_layer_z+2, printable_height)",
         "{z_offset+max_print_height-10}": "z_offset+printable_height-10",
         "{z_offset+printable_height-10}": "z_offset+printable_height-10",
         "max_print_height": "printable_height",
     }
-
-    for prusa, orca in replacements.items():
-        gcode = gcode.replace(prusa, orca)
-
     for prusa, orca in expr_replacements.items():
         gcode = gcode.replace(prusa, orca)
 
