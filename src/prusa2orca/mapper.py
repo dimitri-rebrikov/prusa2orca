@@ -231,7 +231,7 @@ def convert_value(key: str, value: str, target_map: str = "orca") -> str:
 def _convert_placeholders(gcode: str) -> str:
     """Convert Prusa-style gcode placeholders to Orca-style."""
     replacements = {
-        "{first_layer_bed_temperature[0]}": "[hot_plate_temp_initial_layer_single]",
+        "{first_layer_bed_temperature[0]}": "[bed_temperature_initial_layer_single]",
         "{first_layer_temperature[0]}": "[nozzle_temperature_initial_layer]",
         "{temperature[0]}": "[nozzle_temperature]",
         "{bed_temperature[0]}": "[hot_plate_temp]",
@@ -251,6 +251,26 @@ def _convert_placeholders(gcode: str) -> str:
     }
     for prusa, orca in replacements.items():
         gcode = gcode.replace(prusa, orca)
+
+    # Handle Prusa conditional: {is_nil(something) ? fallback : something}
+    # Orca can't evaluate these — replace with the fallback value
+    gcode = re.sub(
+        r"\{is_nil\([^)]+\)\s*\?\s*([^:{}]+)\s*:\s*[^}]+\}",
+        r"\1",
+        gcode,
+    )
+
+    # Simplify end gcode: Prusa's z_offset+min(max_layer_z+2, printable_height)
+    # → Orca's simpler max_layer_z+2
+    gcode = gcode.replace(
+        "z_offset+min(max_layer_z+2, printable_height)",
+        "max_layer_z+2",
+    )
+    gcode = gcode.replace(
+        "z_offset+printable_height-10",
+        "printable_height-10",
+    )
+
     return gcode
 
 
