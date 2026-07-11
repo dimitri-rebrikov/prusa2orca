@@ -25,6 +25,7 @@ from .mapper import (
 )
 from .models import PrusaSection, SectionType
 from .parser import PrusaSection, resolve_inherits
+from .remote import get_orca_template
 
 log = logging.getLogger(__name__)
 
@@ -103,6 +104,12 @@ def build_machine_json(
     name = f"{vendor} {display_name} {nozzle} nozzle"
 
     data = _user_meta(name, "printer_settings_id", inherits="")
+
+    # Apply Orca machine template defaults as fallback
+    tmpl = get_orca_template(vendor, "machine", "fdm_machine_common")
+    if tmpl:
+        for k, v in tmpl.items():
+            data.setdefault(k, v)
 
     # Orca-specific fields
     data["printer_model"] = f"{vendor} {display_name}"
@@ -183,6 +190,12 @@ def build_process_json(
     name = f"{vendor} {printer_short} {nozzle} - {quality_name}"
 
     data = _user_meta(name, "print_settings_id", inherits="")
+
+    # Apply Orca process template defaults as fallback
+    tmpl = get_orca_template(vendor, "process", "fdm_process_common")
+    if tmpl:
+        for k, v in tmpl.items():
+            data.setdefault(k, v)
 
     for prusa_key, orca_key in PRINT_PARAM_MAP.items():
         if prusa_key in resolved_params:

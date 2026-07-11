@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 
 PRUSA_API = "https://api.github.com/repos/prusa3d/PrusaSlicer/contents/resources/profiles"
 PRUSA_RAW = "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/master/resources/profiles"
+ORCA_RAW = "https://raw.githubusercontent.com/OrcaSlicer/OrcaSlicer/main/resources/profiles"
 
 # Cache directory for downloaded .ini files
 CACHE_DIR = Path.home() / ".cache" / "prusa2orca"
@@ -149,3 +150,51 @@ def get_asset_url(vendor: str, filename: str) -> str:
     """Get the raw GitHub URL for a vendor asset file."""
     vendor_dir = get_vendor_dir(vendor)
     return f"{PRUSA_RAW}/{vendor_dir}/{filename}"
+
+
+# ─── Orca Template Defaults ───
+
+ORCA_TEMPLATE_CACHE: Dict[str, Optional[dict]] = {}
+
+
+def get_orca_template(vendor: str, profile_type: str, template_name: str) -> Optional[dict]:
+    """
+    Fetch an OrcaSlicer template JSON from GitHub.
+    
+    Tries vendor-specific first, falls back to Default/.
+    
+    Args:
+        vendor: Vendor name (e.g. 'Creality')
+        profile_type: 'machine', 'process', or 'filament'
+        template_name: e.g. 'fdm_machine_common', 'fdm_process_common'
+    
+    Returns:
+        Dict of key-value defaults, or None if not found.
+    """
+    cache_key = f"{vendor}/{profile_type}/{template_name}"
+    if cache_key in ORCA_TEMPLATE_CACHE:
+        return ORCA_TEMPLATE_CACHE[cache_key]
+
+    # Try vendor-specific path first, then Default/
+    for base in [f"{ORCA_RAW}/{vendor}", f"{ORCA_RAW}/Default"]:
+        url = f"{base}/{profile_type}/{template_name}.json"
+        req = urllib.request.Request(url, headers={"User-Agent": "prusa2orca/0.1"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                # Filter out meta fields
+                skip = {"type", "name", "inherits", "from", "instantiation",
+                        "setting_id", "compatible_printers", "print_settings_id",
+                        "filament_settings_id", "printer_settings_id"}
+                result = {k: v for k, v in data.items() if k not in skip}
+                ORCA_TEMPLATE_CACHE[cache_key] = result
+                log.debug(f"Fetched Orca template: {template_name} from {base}")
+                return result
+        except urllib.error.HTTPError:
+            continue
+        except Exception as e:
+            log.debug(f"Failed to fetch {url}: {e}")
+            continue
+
+    ORCA_TEMPLATE_CACHE[cache_key] = None
+    return None
