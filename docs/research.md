@@ -368,7 +368,8 @@ Source: [OrcaSlicer Wiki](https://www.orcaslicer.com/wiki/developer_reference/ho
 | **Vendor-agnostic** | Single codebase handles Creality, Voron, Anycubic, etc. |
 | **`.orca_printer` output** | Orca's native import format — drag & drop or Import Configs |
 | **User-format JSONs** | `"from": "User"` — update-safe, no system directory manipulation |
-| **`inherits=""`** | User-Format kann System-Templates (`fdm_machine_common`) nicht referenzieren — `find_preset2()` findet nur user-facing Presets, keine Base-Templates mit `instantiation: false`. Quelle: [Preset.cpp Zeile 1684–1701](https://github.com/OrcaSlicer/OrcaSlicer/blob/main/src/libslic3r/Preset.cpp). |
+| **`inherits=""` für alle Typen** | User-Format kann System-Templates (`fdm_machine_common`, `fdm_filament_pla`) nicht referenzieren — `find_preset2()` findet nur user-facing Presets, keine Base-Templates mit `instantiation: false`. Quelle: [Preset.cpp Zeile 1684–1701](https://github.com/OrcaSlicer/OrcaSlicer/blob/main/src/libslic3r/Preset.cpp). Gilt für Printer, Process **und** Filament gleichermaßen. |
+| **Orca-Template-Defaults von GitHub** | `remote.get_orca_template()` holt `fdm_process_common.json`, `fdm_machine_common.json`, `fdm_filament_*.json` zur Laufzeit von OrcaSlicer's GitHub. Fallback: vendor-spezifisch → `Default/`. Werden als Basis gesetzt, Prusa-Werte überschreiben. Keine hartcodierten Defaults. |
 | **Acceleration-Expandierung** | Da `inherits=""`, müssen alle Orca-Felder explizit gesetzt sein. Prusa's `default_acceleration` wird auf alle per-move Acceleration-Felder expandiert. |
 | **Prusa-Werte explizit übernommen** | Alle Werte aus der `.ini` werden explizit gesetzt. `inherits=""` ist korrekt für neue Drucker ohne existierendes Parent-Preset. |
 | **No hardcoded fallbacks** | Every value must come from the Prusa source data |
