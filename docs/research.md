@@ -381,38 +381,65 @@ Wenn ein `.orca_printer` Bundle bereits importiert wurde und erneut
 importiert werden soll (z. B. nach einer Neugenerierung), muss OrcaSlicer
 den alten Bundle-Cache löschen. Sonst ignoriert der Import die neuen Dateien.
 
-### Vorgehen
+### Directory-Struktur
 
-1. **OrcaSlicer schließen**
-2. **Alten Bundle-Ordner löschen** — je nach OS:
+```
+~/.config/OrcaSlicer/user/              ← PRESET_USER_DIR
+└── default/                            ← DEFAULT_USER_FOLDER_NAME
+    ├── _local/                         ← PRESET_LOCAL_DIR
+    │   └── <bundle_id>/
+    │       ├── bundle_metadata.json    ← PRESET_BUNDLE_METADATA
+    │       └── ... (extracted JSONs)
+    ├── machine/                        ← alte Drucker-Profile
+    ├── process/                        ← alte Process-Profile
+    └── filament/                       ← alte Filament-Profile
+```
 
-   | OS | Pfad |
-   |---|---|
-   | **Windows** | `%APPDATA%\OrcaSlicer\user\default\_local\<bundle_id>\` |
-   | **Linux** | `~/.config/OrcaSlicer/user/<UID>/local/<bundle_id>/` |
-   | **macOS** | `~/Library/Application Support/OrcaSlicer/user/<UID>/local/<bundle_id>/` |
+Beim Import werden die JSONs aus dem Bundle in `machine/`, `process/`,
+`filament/` entpackt. Die `bundle_metadata.json` merkt sich die Bundle-ID.
+Bei erneutem Import mit derselben ID überspringt Orca den Vorgang —
+**auch wenn sich der Inhalt geändert hat**.
 
-   Die `<bundle_id>` steht in der `bundle_structure.json` des `.orca_printer`-Bundles
-   (z. B. `_Creality CR-5 Pro H_20260704184407`).
+### Vorgehen für sauberen Re-Import
 
-3. **Oder gesamten `_local`-Ordner leeren** (entfernt alle importierten Bundles):
+**Variante A — Gezielt (nur Profile eines Bundles):**
 
-   ```bash
-   # Linux
-   rm -rf ~/.config/OrcaSlicer/user/*/local/*/
+```bash
+# 1. OrcaSlicer schließen
 
-   # Windows (PowerShell)
-   Remove-Item "$env:APPDATA\OrcaSlicer\user\*\_local\*\" -Recurse
-   ```
+# 2. Bundle-ID aus alter bundle_structure.json ermitteln
+#    (z.B. "_Creality CR-5 Pro H_20260704184407")
 
-4. **OrcaSlicer starten** und `.orca_printer` erneut importieren
-   (`File → Import → Import Configs`)
+# 3. Bundle-Metadaten + extrahierte Profile löschen
+#    Linux:
+rm -rf ~/.config/OrcaSlicer/user/*/_local/<bundle_id>/
+rm -f  ~/.config/OrcaSlicer/user/*/machine/"Creality CR-5 Pro H"*.json
+rm -f  ~/.config/OrcaSlicer/user/*/process/"Creality CR-5 Pro H"*.json
+rm -f  ~/.config/OrcaSlicer/user/*/filament/"Creality CR-5 Pro H"*.json
 
-### Hintergrund
+#    Windows (PowerShell):
+Remove-Item "$env:APPDATA\OrcaSlicer\user\*\_local\<bundle_id>\" -Recurse
+Remove-Item "$env:APPDATA\OrcaSlicer\user\*\machine\Creality CR-5 Pro H*.json"
+Remove-Item "$env:APPDATA\OrcaSlicer\user\*\process\Creality CR-5 Pro H*.json"
+Remove-Item "$env:APPDATA\OrcaSlicer\user\*\filament\Creality CR-5 Pro H*.json"
 
-Beim Import speichert Orca die Profile unter `user/<UID>/local/<bundle_id>/`.
-Die `bundle_id` wird aus dem Bundle generiert. Ein erneuter Import mit derselben
-`bundle_id` wird von Orca als "bereits vorhanden" erkannt und ignoriert —
-selbst wenn sich der Inhalt geändert hat. Daher muss der alte Ordner vorher
-gelöscht werden.
+# 4. OrcaSlicer starten und .orca_printer erneut importieren
+```
+
+**Variante B — Komplett (alle User-Profile weg, danach neu importieren):**
+
+```bash
+# Linux: komplettes user/default löschen
+rm -rf ~/.config/OrcaSlicer/user/*/
+```
+
+```powershell
+# Windows: komplettes user/default löschen
+Remove-Item "$env:APPDATA\OrcaSlicer\user\*\" -Recurse
+```
+
+Danach Orca starten → `.orca_printer` importieren.
+
+> **Achtung:** Variante B löscht **alle** selbst erstellten Profile
+> (nicht nur die aus dem Bundle), aber nicht die System-Profile.
 
