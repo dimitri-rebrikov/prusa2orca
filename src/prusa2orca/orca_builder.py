@@ -214,6 +214,7 @@ def build_process_json(
             "inner_wall_acceleration", "outer_wall_acceleration",
             "initial_layer_acceleration", "top_surface_acceleration",
             "sparse_infill_acceleration", "internal_solid_infill_acceleration",
+            "travel_acceleration",
         ):
             if acc_key not in data:
                 data[acc_key] = accel
