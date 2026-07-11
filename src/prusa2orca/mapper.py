@@ -268,9 +268,9 @@ def _convert_placeholders(gcode: str) -> str:
 
     # Expression replacements: max_print_height → printable_height
     expr_replacements = {
-        "{z_offset+min(max_layer_z+2, max_print_height)}": "z_offset+min(max_layer_z+2, printable_height)",
-        "{z_offset+max_print_height-10}": "z_offset+printable_height-10",
-        "{z_offset+printable_height-10}": "z_offset+printable_height-10",
+        "{z_offset+min(max_layer_z+2, max_print_height)}": "{z_offset+min(max_layer_z+2, printable_height)}",
+        "{z_offset+max_print_height-10}": "{z_offset+printable_height-10}",
+        "{z_offset+printable_height-10}": "{z_offset+printable_height-10}",
         "max_print_height": "printable_height",
     }
     for prusa, orca in expr_replacements.items():
