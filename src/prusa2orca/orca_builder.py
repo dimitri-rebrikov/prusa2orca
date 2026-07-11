@@ -234,8 +234,14 @@ def build_filament_json(
     original = section_name.split("@")[0].strip() if "@" in section_name else section_name
     name = f"{vendor} {printer_short} - {original}"
 
-    data = _user_meta(name, "filament_settings_id",
-                       inherits=f"fdm_filament_{filament_type.lower()}")
+    data = _user_meta(name, "filament_settings_id", inherits="")
+
+    # Apply Orca filament template defaults as fallback
+    ft = filament_type.lower()
+    tmpl = get_orca_template(vendor, "filament", f"fdm_filament_{ft}")
+    if tmpl:
+        for k, v in tmpl.items():
+            data.setdefault(k, v)
 
     for prusa_key, orca_key in FILAMENT_PARAM_MAP.items():
         if prusa_key in resolved_params:
