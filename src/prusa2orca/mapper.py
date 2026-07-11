@@ -95,6 +95,17 @@ PRINT_PARAM_MAP: Dict[str, str] = {
     "resolution": "resolution",
     "gcode_comments": "gcode_substitutions",
     "output_filename_format": "filename_format",
+    "dont_support_bridges": "bridge_no_support",
+    "external_fill_pattern": "top_surface_pattern",
+    "complete_objects": "print_sequence",
+    "extra_perimeters": "extra_perimeters_on_overhangs",
+    "gcode_label_objects": "gcode_label_objects",
+    "interface_shells": "interface_shells",
+    "small_perimeter_speed": "small_perimeter_speed",
+    "bridge_angle": "bridge_angle",
+    "post_process": "post_process",
+    "standby_temperature_delta": "standby_temperature_delta",
+    "avoid_crossing_perimeters": "reduce_crossing_wall",
 }
 
 # ─── Filament Settings: Prusa → Orca ───
