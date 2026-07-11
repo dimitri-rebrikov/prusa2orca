@@ -260,17 +260,6 @@ def _convert_placeholders(gcode: str) -> str:
         gcode,
     )
 
-    # Simplify end gcode: Prusa's z_offset+min(max_layer_z+2, printable_height)
-    # → Orca's simpler max_layer_z+2
-    gcode = gcode.replace(
-        "z_offset+min(max_layer_z+2, printable_height)",
-        "max_layer_z+2",
-    )
-    gcode = gcode.replace(
-        "z_offset+printable_height-10",
-        "printable_height-10",
-    )
-
     return gcode
 
 
