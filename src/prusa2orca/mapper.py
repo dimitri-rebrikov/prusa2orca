@@ -9,10 +9,11 @@ Contains:
   - Printer compatibility condition matching
 """
 
-from __future__ import annotations
-
+import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Tuple
+
+log = logging.getLogger(__name__)
 
 # ─── Print Settings: Prusa → Orca ───
 PRINT_PARAM_MAP: Dict[str, str] = {
@@ -110,8 +111,8 @@ PRINT_PARAM_MAP: Dict[str, str] = {
 
 # ─── Filament Settings: Prusa → Orca ───
 FILAMENT_PARAM_MAP: Dict[str, str] = {
-    "bed_temperature": "hot_plate_temp",
-    "first_layer_bed_temperature": "hot_plate_temp_initial_layer",
+    "bed_temperature": "bed_temperature",
+    "first_layer_bed_temperature": "bed_temperature_initial_layer",
     "temperature": "nozzle_temperature",
     "first_layer_temperature": "nozzle_temperature_initial_layer",
     "filament_type": "filament_type",
@@ -229,12 +230,25 @@ def convert_value(key: str, value: str, target_map: str = "orca") -> str:
 
 
 def _convert_placeholders(gcode: str) -> str:
-    """Convert Prusa-style gcode placeholders to Orca-style."""
+    """Convert Prusa-style gcode placeholders to Orca-style.
+
+    The mapping is derived from the FILAMENT_PARAM_MAP and PRINT_PARAM_MAP
+    tables: Prusa gcode uses {param_name[0]} for array values, Orca uses
+    [param_name] or [param_name_single] for the single-extruder variant.
+    Non-bracket expression replacements (e.g. max_print_height → printable_height)
+    are listed separately.
+    """
+    # Placeholder mappings: {Prusa_gcode_var} → [Orca_gcode_var]
+    # Derived from FILAMENT_PARAM_MAP by the pattern:
+    #   {prusa_name[0]} → [orca_name]  (array → scalar)
+    #   {prusa_name[0]} → [orca_name_single] (array → single-extruder)
+    # Example: Prusa "first_layer_bed_temperature" → Orca "bed_temperature_initial_layer"
+    #   → gcode:  {first_layer_bed_temperature[0]} → [bed_temperature_initial_layer_single]
     replacements = {
         "{first_layer_bed_temperature[0]}": "[bed_temperature_initial_layer_single]",
         "{first_layer_temperature[0]}": "[nozzle_temperature_initial_layer]",
         "{temperature[0]}": "[nozzle_temperature]",
-        "{bed_temperature[0]}": "[hot_plate_temp]",
+        "{bed_temperature[0]}": "[bed_temperature]",
         "{filament_type[0]}": "[filament_type]",
         "{printer_model}": "[printer_model]",
         "{input_filename_base}": "[input_filename_base]",
@@ -242,18 +256,26 @@ def _convert_placeholders(gcode: str) -> str:
         "{layer_z}": "[layer_z]",
         "{max_layer_z}": "[max_layer_z]",
         "{travel_speed*60}": "[travel_speed*60]",
+        "{print_bed_max[1]*0.85}": "[print_bed_max[1]*0.85]",
+        "{print_bed_max[1]*0.8}": "[print_bed_max[1]*0.8]",
+    }
+
+    # Expression replacements (variables in expressions, not in brackets)
+    expr_replacements = {
         "{z_offset+min(max_layer_z+2, max_print_height)}": "z_offset+min(max_layer_z+2, printable_height)",
         "{z_offset+max_print_height-10}": "z_offset+printable_height-10",
         "{z_offset+printable_height-10}": "z_offset+printable_height-10",
-        "{print_bed_max[1]*0.85}": "[print_bed_max[1]*0.85]",
-        "{print_bed_max[1]*0.8}": "[print_bed_max[1]*0.8]",
         "max_print_height": "printable_height",
     }
+
     for prusa, orca in replacements.items():
         gcode = gcode.replace(prusa, orca)
 
+    for prusa, orca in expr_replacements.items():
+        gcode = gcode.replace(prusa, orca)
+
     # Handle Prusa conditional: {is_nil(something) ? fallback : something}
-    # Orca can't evaluate these — replace with the fallback value
+    # Orca can't evaluate these — replace with the fallback value from Prusa
     gcode = re.sub(
         r"\{is_nil\([^)]+\)\s*\?\s*([^:{}]+)\s*:\s*[^}]+\}",
         r"\1",
