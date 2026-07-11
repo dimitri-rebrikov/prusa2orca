@@ -89,8 +89,8 @@ def test_convert_creality_cr5proh():
     assert p.get("printer_settings_id"), "printer_settings_id missing"
     assert p.get("is_custom_defined") == "0"
     assert p.get("version") == "2.3.1.10"
-    assert p.get("inherits") == "fdm_machine_common", \
-        f"Machine inherits should reference base, got: {p.get('inherits')}"
+    assert p.get("inherits") == "", \
+        f"User printer should have empty inherits, got: {p.get('inherits')}"
     assert len(p.get("printer_settings_id", "")) > 0
     assert p.get("retraction_length") == ["3"]
 
@@ -103,8 +103,8 @@ def test_convert_creality_cr5proh():
         "compatible_printers should not be in user process"
     assert pr.get("print_settings_id"), "print_settings_id missing"
     assert pr.get("layer_height") == "0.20"
-    assert pr.get("inherits") == "fdm_process_common", \
-        f"Process inherits should reference base, got: {pr.get('inherits')}"
+    assert pr.get("inherits") == "", \
+        f"User process should have empty inherits, got: {pr.get('inherits')}"
     assert pr["name"].startswith("Creality CR-5 Pro H"), \
         f"Process name should start with printer name: {pr['name']}"
 

@@ -368,8 +368,8 @@ Source: [OrcaSlicer Wiki](https://www.orcaslicer.com/wiki/developer_reference/ho
 | **Vendor-agnostic** | Single codebase handles Creality, Voron, Anycubic, etc. |
 | **`.orca_printer` output** | Orca's native import format — drag & drop or Import Configs |
 | **User-format JSONs** | `"from": "User"` — update-safe, no system directory manipulation |
-| **Inherits from base profiles** | `inherits="fdm_process_common"` — fehlende Felder kommen vom Orca-Parent. **Nicht** `inherits=""` (standalone), das würde jedes fehlende Feld auf Orca-Intern-Default fallen lassen. |
-| **Prusa-Werte explizit übernommen** | Alle Werte aus der `.ini` werden trotzdem explizit gesetzt. `inherits` ist nur Sicherheitsnetz für Orca-Felder die Prusa nicht kennt. |
-| **Keine Wert-Expandierung** | Acceleration nicht künstlich auf alle Orca-Felder expandieren — fehlende Felder kommen sauber vom `fdm_process_common`-Parent. |
+| **`inherits=""`** | User-Format kann System-Templates (`fdm_machine_common`) nicht referenzieren — `find_preset2()` findet nur user-facing Presets, keine Base-Templates mit `instantiation: false`. Quelle: [Preset.cpp Zeile 1684–1701](https://github.com/OrcaSlicer/OrcaSlicer/blob/main/src/libslic3r/Preset.cpp). |
+| **Acceleration-Expandierung** | Da `inherits=""`, müssen alle Orca-Felder explizit gesetzt sein. Prusa's `default_acceleration` wird auf alle per-move Acceleration-Felder expandiert. |
+| **Prusa-Werte explizit übernommen** | Alle Werte aus der `.ini` werden explizit gesetzt. `inherits=""` ist korrekt für neue Drucker ohne existierendes Parent-Preset. |
 | **No hardcoded fallbacks** | Every value must come from the Prusa source data |
 | **Deterministic filenames** | Profile names sanitized for cross-platform filesystem compatibility |
